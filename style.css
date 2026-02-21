@@ -1,14 +1,9 @@
 .model_name_formatter_settings {
-    background: var(--greyExtraDark);
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-}
-
-.model_name_formatter_settings h4 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    font-size: 16px;
+    width: 100%;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    margin-bottom: 0;
 }
 
 .model_name_formatter_settings small {
