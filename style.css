@@ -59,3 +59,23 @@ body.mnf-show-model .mes:not([is_user="true"]) .clean_model_name {
 body:not(.mnf-show-model) .clean_model_name {
     display: none !important;
 }
+
+/* Prevent long model names from pushing message action buttons out of view */
+body.mnf-show-model .mes:not([is_user="true"]) .mes_block .ch_name > .flex1,
+body.mnf-show-model .mes:not([is_user="true"]) .mes_block .ch_name .alignItemsBaseline {
+    min-width: 0;
+}
+
+body.mnf-show-model .mes:not([is_user="true"]) .mes_block .ch_name .alignItemsBaseline {
+    overflow: hidden;
+}
+
+body.mnf-show-model .mes:not([is_user="true"]) .mes_buttons {
+    flex: 0 0 auto;
+}
+
+body.mnf-show-model .mes:not([is_user="true"]) .clean_model_name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
