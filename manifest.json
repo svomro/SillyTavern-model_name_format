@@ -1,0 +1,8 @@
+{
+    "id": "model_name_formatter",
+    "name": "Model Name Formatter",
+    "version": "1.0",
+    "description": "Replaces AI character names with cleanly formatted API model names. Includes a toggle in the Extensions panel.",
+    "author": "Antigravity",
+    "supported_assets": ["js", "css", "html"]
+}

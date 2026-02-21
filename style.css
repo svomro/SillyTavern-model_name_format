@@ -1,0 +1,38 @@
+.model_name_formatter_settings {
+    background: var(--greyExtraDark);
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.model_name_formatter_settings h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.model_name_formatter_settings small {
+    display: block;
+    margin-top: 5px;
+    color: var(--greyLight);
+}
+
+/* 只有开启扩展时，隐藏原本的名字，显示新模型名 */
+body.mnf-enabled .mes:not([is_user="true"]) .name_text {
+    display: none !important;
+}
+
+body.mnf-enabled .mes:not([is_user="true"]) .clean_model_name {
+    display: inline-block !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    font-family: -apple-system, "PingFang SC", sans-serif !important;
+    color: #555555;
+    margin-right: 6px;
+    white-space: nowrap;
+}
+
+/* 未开启或未注入时，隐藏注入的span */
+body:not(.mnf-enabled) .clean_model_name {
+    display: none !important;
+}
