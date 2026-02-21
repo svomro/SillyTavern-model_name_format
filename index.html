@@ -1,8 +1,31 @@
 <div class="model_name_formatter_settings">
-    <h4>Model Name Formatter</h4>
-    <label class="checkbox_label">
-        <input id="mnf_enable_toggle" type="checkbox" checked>
-        <span>Replace AI Character Names with Model Names</span>
-    </label>
-    <small>Switches the display in chat from character name to the cleanly formatted API Model Name (e.g., stripping openrouter-, dates). Note: Refresh chat or receive new message to apply fully.</small>
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Model Name Formatter</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <label class="checkbox_label">
+                <input id="mnf_show_ch_name_toggle" type="checkbox">
+                <span>对方名称常显（忽略 hover）</span>
+            </label>
+
+            <label class="checkbox_label">
+                <input id="mnf_show_model_toggle" type="checkbox" checked>
+                <span>显示模型名称（关闭时显示昵称）</span>
+            </label>
+
+            <label class="checkbox_label mnf_split_level_row">
+                <span>模型名称切割</span>
+                <select id="mnf_split_level">
+                    <option value="0">0（原样保留）</option>
+                    <option value="1">1 档（去渠道前缀）</option>
+                    <option value="2">2 档（再去组织前缀）</option>
+                    <option value="3">3 档（再去末尾后缀）</option>
+                </select>
+            </label>
+
+            <small>规则：0 原样保留；第1步取首个 " - " 后；第2步优先取首个 "/" 后，无 "/" 则再取首个 " - " 后；第3步取最后一个 "-" 前。</small>
+        </div>
+    </div>
 </div>

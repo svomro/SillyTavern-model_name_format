@@ -17,12 +17,40 @@
     color: var(--greyLight);
 }
 
-/* 只有开启扩展时，隐藏原本的名字，显示新模型名 */
-body.mnf-enabled .mes:not([is_user="true"]) .name_text {
+.mnf_split_level_row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: nowrap;
+}
+
+.mnf_split_level_row > span {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+#mnf_split_level {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+}
+
+/* 开启后仅 AI 侧名称常显，关闭则回退到用户自定义 CSS（例如 hover 显示） */
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_block .ch_name {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* 只有开启模型名显示时，隐藏原本名字 */
+body.mnf-show-model .mes:not([is_user="true"]) .name_text {
     display: none !important;
 }
 
-body.mnf-enabled .mes:not([is_user="true"]) .clean_model_name {
+body.mnf-show-model .mes:not([is_user="true"]) .clean_model_name {
     display: inline-block !important;
     font-size: 16px !important;
     font-weight: 700 !important;
@@ -32,7 +60,7 @@ body.mnf-enabled .mes:not([is_user="true"]) .clean_model_name {
     white-space: nowrap;
 }
 
-/* 未开启或未注入时，隐藏注入的span */
-body:not(.mnf-enabled) .clean_model_name {
+/* 显示昵称时，隐藏注入的模型名 */
+body:not(.mnf-show-model) .clean_model_name {
     display: none !important;
 }

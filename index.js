@@ -1,112 +1,215 @@
-import { getContext, extension_settings } from '../../../extensions.js';
-import { eventSource, event_types } from '../../../../script.js';
+import { getContext, extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
+import { eventSource, event_types } from '../../../script.js';
 
 const EXTENSION_NAME = 'model_name_formatter';
-const DEFAULT_SETTINGS = { enabled: true };
+const DEFAULT_SETTINGS = {
+    showModelName: true,
+    showChName: false,
+    splitLevel: 2,
+};
 
-// Clean up model names based on specific regex rules
-function formatModelName(rawName) {
-    if (!rawName) return "";
-
-    let name = String(rawName);
-
-    // 1. Remove common prefixes before the first hyphen (e.g., "openrouter - ")
-    const prefixSlashMatch = name.match(/^[^/]*\/([^-]*)-/);
-    if(prefixSlashMatch) {
-         name = name.replace(/^[^/]*\//, '');
-    } else {
-         name = name.replace(/^[\w\s]+ \- /, '');
-    }
-    
-    // 2. Remove any remaining prefix before a slash if it exists
-    if (name.includes('/')) {
-        name = name.split('/').pop();
-    }
-
-    // 3. Remove trailing dates or version numbers (e.g., "- 0901", "- 20241022")
-    name = name.replace(/[- ]+\d{4,8}$/, '');
-    
-    // 4. Optionally ignore "-32b", "8b" flags ending
-    name = name.replace(/[- ]+\d{1,3}[BbmMkK]$/, '');
-
-    return name.trim();
+function clampSplitLevel(value) {
+    const level = Number.parseInt(value, 10);
+    if (Number.isNaN(level)) return DEFAULT_SETTINGS.splitLevel;
+    return Math.min(3, Math.max(0, level));
 }
 
-// Inject model names into AI messages
-function injectModelNames() {
-    // Only process AI messages
-    const aiMessages = document.querySelectorAll('.mes:not([is_user="true"])');
-    
-    aiMessages.forEach(mes => {
-        const timestampEl = mes.querySelector('.timestamp[title]');
-        const nameContainer = mes.querySelector('.alignItemsBaseline');
-        
-        // Skip if elements are missing or title is empty
-        if (!timestampEl || !nameContainer || !timestampEl.getAttribute('title')) return;
-        
-        // Skip if already injected
-        if (mes.querySelector('.clean_model_name')) return;
-        
-        const rawModelName = timestampEl.getAttribute('title');
-        const cleanName = formatModelName(rawModelName);
-        
-        // Create span to hold clean model name
-        const modelNameSpan = document.createElement('span');
+function getSettings() {
+    const settings = extension_settings[EXTENSION_NAME] ?? {};
+
+    // Backward compatibility for old `enabled` key.
+    if (typeof settings.showModelName !== 'boolean') {
+        settings.showModelName = typeof settings.enabled === 'boolean'
+            ? settings.enabled
+            : DEFAULT_SETTINGS.showModelName;
+    }
+    if (typeof settings.showChName !== 'boolean') {
+        settings.showChName = DEFAULT_SETTINGS.showChName;
+    }
+
+    settings.splitLevel = clampSplitLevel(settings.splitLevel ?? DEFAULT_SETTINGS.splitLevel);
+    delete settings.enabled;
+
+    extension_settings[EXTENSION_NAME] = settings;
+    return settings;
+}
+
+function keepAfterFirstDash(text) {
+    const input = String(text ?? '').trim();
+    const index = input.indexOf(' - ');
+    if (index < 0) return input;
+    return input.slice(index + 3).trim();
+}
+
+function keepAfterFirstSlash(text) {
+    const input = String(text ?? '').trim();
+    const index = input.indexOf('/');
+    if (index < 0) return input;
+    return input.slice(index + 1).trim();
+}
+
+function keepBeforeLastDash(text) {
+    const input = String(text ?? '').trim();
+    const index = input.lastIndexOf('-');
+    if (index < 0) return input;
+    return input.slice(0, index).trim();
+}
+
+// Split levels:
+// 0 -> no split: keep original
+// 1 -> first split: keep content after first " - "
+// 2 -> level1 + second split: keep after first "/" else after first " - "
+// 3 -> level2 + third split: keep content before last "-"
+function formatModelName(rawName, splitLevel) {
+    const level = clampSplitLevel(splitLevel);
+    const original = String(rawName ?? '').trim();
+    if (!original) return '';
+
+    let result = original;
+
+    if (level >= 1) {
+        result = keepAfterFirstDash(result);
+    }
+
+    if (level >= 2) {
+        result = result.includes('/')
+            ? keepAfterFirstSlash(result)
+            : keepAfterFirstDash(result);
+    }
+
+    if (level >= 3) {
+        result = keepBeforeLastDash(result);
+    }
+
+    return result || original;
+}
+
+function getRawModelName(messageElement, chatMessages) {
+    const messageIdText = messageElement.getAttribute('mesid');
+    const messageId = Number.parseInt(String(messageIdText ?? ''), 10);
+
+    if (!Number.isNaN(messageId) && Array.isArray(chatMessages)) {
+        const message = chatMessages[messageId];
+        const api = message?.extra?.api;
+        const model = message?.extra?.model;
+
+        if (model) {
+            return `${api ? `${api} - ` : ''}${model}`;
+        }
+    }
+
+    const timestampEl = messageElement.querySelector('.timestamp');
+    return timestampEl?.getAttribute('title')?.trim() ?? '';
+}
+
+function upsertModelName(messageElement, splitLevel, chatMessages) {
+    const timestampEl = messageElement.querySelector('.timestamp');
+    const rawModelName = getRawModelName(messageElement, chatMessages);
+    if (!rawModelName) return;
+
+    // Keep tooltip source aligned with actual message metadata when available.
+    if (timestampEl && timestampEl.getAttribute('title') !== rawModelName) {
+        timestampEl.setAttribute('title', rawModelName);
+    }
+
+    const displayName = formatModelName(rawModelName, splitLevel);
+    if (!displayName) return;
+
+    const nameContainer = messageElement.querySelector('.ch_name .alignItemsBaseline') || messageElement.querySelector('.ch_name');
+    if (!nameContainer) return;
+
+    let modelNameSpan = messageElement.querySelector('.clean_model_name');
+    if (!modelNameSpan) {
+        modelNameSpan = document.createElement('span');
         modelNameSpan.className = 'clean_model_name';
-        modelNameSpan.textContent = cleanName;
-        
-        // Insert it right before the original name_text
-        const nameTextEl = mes.querySelector('.name_text');
-        if (nameTextEl) {
+        const nameTextEl = messageElement.querySelector('.name_text');
+        if (nameTextEl && nameTextEl.parentElement === nameContainer) {
             nameContainer.insertBefore(modelNameSpan, nameTextEl);
         } else {
-            // Fallback just prepend
             nameContainer.prepend(modelNameSpan);
         }
-    });
-}
-
-// Init UI toggle switch in extension panel
-function initUI() {
-    const context = getContext();
-    if (typeof extension_settings[EXTENSION_NAME] === 'undefined') {
-        extension_settings[EXTENSION_NAME] = DEFAULT_SETTINGS;
     }
 
-    const toggleBtn = document.getElementById('mnf_enable_toggle');
-    if (toggleBtn) {
-        toggleBtn.checked = extension_settings[EXTENSION_NAME].enabled;
-        
-        toggleBtn.addEventListener('change', (e) => {
-            extension_settings[EXTENSION_NAME].enabled = e.target.checked;
-            context.saveSettings();
+    modelNameSpan.textContent = displayName;
+}
+
+// Inject or update model names in AI messages
+function injectModelNames() {
+    const settings = getSettings();
+    const context = getContext();
+    const chatMessages = context.chat;
+    const aiMessages = document.querySelectorAll('.mes:not([is_user="true"])');
+    aiMessages.forEach(mes => upsertModelName(mes, settings.splitLevel, chatMessages));
+}
+
+function initUI() {
+    const context = getContext();
+    const settings = getSettings();
+
+    const showModelToggle = document.getElementById('mnf_show_model_toggle');
+    if (showModelToggle) {
+        showModelToggle.checked = settings.showModelName;
+        showModelToggle.addEventListener('change', (e) => {
+            settings.showModelName = Boolean(e.target.checked);
+            context.saveSettingsDebounced();
+            applyState();
+        });
+    }
+
+    const showChNameToggle = document.getElementById('mnf_show_ch_name_toggle');
+    if (showChNameToggle) {
+        showChNameToggle.checked = settings.showChName;
+        showChNameToggle.addEventListener('change', (e) => {
+            settings.showChName = Boolean(e.target.checked);
+            context.saveSettingsDebounced();
+            applyState();
+        });
+    }
+
+    const splitLevelSelect = document.getElementById('mnf_split_level');
+    if (splitLevelSelect) {
+        splitLevelSelect.value = String(settings.splitLevel);
+        splitLevelSelect.addEventListener('change', (e) => {
+            settings.splitLevel = clampSplitLevel(e.target.value);
+            context.saveSettingsDebounced();
+            injectModelNames();
             applyState();
         });
     }
 }
 
-// Toggle body class so CSS activates/deactivates visibility
 function applyState() {
-    if (extension_settings[EXTENSION_NAME].enabled) {
-        document.body.classList.add('mnf-enabled');
-        injectModelNames(); // Inject immediately if already loaded
-    } else {
-        document.body.classList.remove('mnf-enabled');
-    }
+    const settings = getSettings();
+    document.body.classList.toggle('mnf-show-model', settings.showModelName);
+    document.body.classList.toggle('mnf-show-ch-name', settings.showChName);
+    injectModelNames();
 }
 
-// Mount point for SillyTavern extension
 jQuery(async () => {
-    // Parse HTML UI
-    const htmlResponse = await fetch('/scripts/extensions/model_name_formatter/index.html');
-    const htmlText = await htmlResponse.text();
+    const htmlText = await renderExtensionTemplateAsync(EXTENSION_NAME, 'index');
     $('#extensions_settings').append(htmlText);
 
     initUI();
     applyState();
 
-    // Hook into message receive and chat updates
-    eventSource.on(event_types.MESSAGE_RECEIVED, () => setTimeout(injectModelNames, 100));
-    eventSource.on(event_types.CHAT_CHANGED, () => setTimeout(injectModelNames, 300));
-    eventSource.on(event_types.MESSAGE_UPDATED, () => setTimeout(injectModelNames, 100));
+    const scheduleRefresh = (delayMs = 100) => setTimeout(injectModelNames, delayMs);
+    eventSource.on(event_types.MESSAGE_RECEIVED, () => scheduleRefresh(100));
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, () => scheduleRefresh(100));
+    eventSource.on(event_types.MESSAGE_UPDATED, () => scheduleRefresh(100));
+    eventSource.on(event_types.MESSAGE_SWIPED, () => scheduleRefresh(100));
+    eventSource.on(event_types.CHAT_CHANGED, () => scheduleRefresh(300));
+    eventSource.on(event_types.GENERATION_ENDED, () => scheduleRefresh(100));
+    eventSource.on(event_types.GENERATION_STOPPED, () => scheduleRefresh(100));
+    eventSource.on(event_types.CHATCOMPLETION_MODEL_CHANGED, () => scheduleRefresh(50));
+
+    const chatRoot = document.getElementById('chat');
+    if (chatRoot) {
+        const observer = new MutationObserver(() => scheduleRefresh(30));
+        observer.observe(chatRoot, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['title', 'mesid', 'is_user'],
+        });
+    }
 });
