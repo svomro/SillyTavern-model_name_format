@@ -79,3 +79,24 @@ body.mnf-show-model .mes:not([is_user="true"]) .clean_model_name {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Keep AI header layout as flex so action menu (ellipsis) stays visible */
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_block .ch_name {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+}
+
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_block .ch_name > .flex1,
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_block .ch_name .alignItemsBaseline {
+    min-width: 0;
+}
+
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_block .ch_name .alignItemsBaseline {
+    overflow: hidden;
+}
+
+body.mnf-show-ch-name .mes:not([is_user="true"]) .mes_buttons {
+    flex: 0 0 auto;
+    margin-left: 8px;
+}
