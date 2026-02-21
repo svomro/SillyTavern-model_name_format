@@ -1,7 +1,29 @@
-import { getContext, extension_settings, renderExtensionTemplateAsync } from '../../extensions.js';
-import { eventSource, event_types } from '../../../script.js';
+import { getContext, extension_settings, renderExtensionTemplateAsync } from '/scripts/extensions.js';
+import { eventSource, event_types } from '/script.js';
 
-const EXTENSION_NAME = 'model_name_formatter';
+const SETTINGS_KEY = 'model_name_formatter';
+
+function resolveExtensionPathName() {
+    const marker = '/scripts/extensions/';
+    const pathname = new URL(import.meta.url).pathname;
+    const markerIndex = pathname.indexOf(marker);
+
+    if (markerIndex < 0) {
+        return SETTINGS_KEY;
+    }
+
+    const tail = pathname.slice(markerIndex + marker.length);
+    const parts = tail.split('/').filter(Boolean);
+
+    // Remove current filename (typically index.js)
+    if (parts.length > 0) {
+        parts.pop();
+    }
+
+    return parts.join('/') || SETTINGS_KEY;
+}
+
+const EXTENSION_PATH_NAME = resolveExtensionPathName();
 const DEFAULT_SETTINGS = {
     showModelName: true,
     showChName: false,
@@ -15,7 +37,7 @@ function clampSplitLevel(value) {
 }
 
 function getSettings() {
-    const settings = extension_settings[EXTENSION_NAME] ?? {};
+    const settings = extension_settings[SETTINGS_KEY] ?? {};
 
     // Backward compatibility for old `enabled` key.
     if (typeof settings.showModelName !== 'boolean') {
@@ -30,7 +52,7 @@ function getSettings() {
     settings.splitLevel = clampSplitLevel(settings.splitLevel ?? DEFAULT_SETTINGS.splitLevel);
     delete settings.enabled;
 
-    extension_settings[EXTENSION_NAME] = settings;
+    extension_settings[SETTINGS_KEY] = settings;
     return settings;
 }
 
@@ -186,7 +208,7 @@ function applyState() {
 }
 
 jQuery(async () => {
-    const htmlText = await renderExtensionTemplateAsync(EXTENSION_NAME, 'index');
+    const htmlText = await renderExtensionTemplateAsync(EXTENSION_PATH_NAME, 'index');
     $('#extensions_settings').append(htmlText);
 
     initUI();
