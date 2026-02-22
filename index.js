@@ -70,18 +70,47 @@ function keepAfterFirstSlash(text) {
     return input.slice(index + 1).trim();
 }
 
-function keepBeforeLastDash(text) {
+// Metadata suffix patterns stripped by level 3.
+// Each regex anchors to $ and starts with a dash.
+const SUFFIX_PATTERNS = [
+    /-\d{4}-\d{2}-\d{2}$/,                        // ISO date: -2025-04-16
+    /-\d{2}-\d{2}$/,                               // Short date: -05-06
+    /-\d{8}$/,                                     // Compact date: -20241022
+    /-\d{4}$/,                                     // 4-digit date/version: -2411, -0324
+    /-a\d+[bB]$/i,                                 // Compound param size: -a22b
+    /-\d{1,4}[bBkK]$/,                             // Param/context size: -32b, -128k
+    /-(?:preview|latest|instruct|online|free)$/i,  // Metadata tags
+];
+
+function stripMetadataSuffixes(text) {
     const input = String(text ?? '').trim();
-    const index = input.lastIndexOf('-');
-    if (index < 0) return input;
-    return input.slice(0, index).trim();
+    if (!input) return input;
+
+    let result = input;
+    let changed = true;
+
+    while (changed) {
+        changed = false;
+        for (const pattern of SUFFIX_PATTERNS) {
+            if (pattern.test(result)) {
+                const candidate = result.replace(pattern, '').trim();
+                if (candidate.length > 0) {
+                    result = candidate;
+                    changed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    return result;
 }
 
 // Split levels:
 // 0 -> no split: keep original
 // 1 -> first split: keep content after first " - "
 // 2 -> level1 + second split: keep after first "/" else after first " - "
-// 3 -> level2 + third split: keep content before last "-"
+// 3 -> level2 + third split: strip trailing date / size / tag suffixes
 function formatModelName(rawName, splitLevel) {
     const level = clampSplitLevel(splitLevel);
     const original = String(rawName ?? '').trim();
@@ -100,7 +129,7 @@ function formatModelName(rawName, splitLevel) {
     }
 
     if (level >= 3) {
-        result = keepBeforeLastDash(result);
+        result = stripMetadataSuffixes(result);
     }
 
     return result || original;
